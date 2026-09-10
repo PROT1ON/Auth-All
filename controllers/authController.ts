@@ -8,6 +8,9 @@ import {
 } from "../utils/hashPassword.ts";
 
 import { generateTokens } from "../utils/authHandler.ts";
+import { generateOTP } from "../utils/generateOTP.ts";
+import sendMail from "../utils/emailHandler.ts";
+import { sendVerificationMail } from "../services/mailService.ts";
 
 export const getAllUsersController = async (
   req: Request,
@@ -32,27 +35,39 @@ export const registerController = async (
   res: Response,
   next: NextFunction
 ) => {
-    const {username, password, email} = req.body
+  const { username, password, email } = req.body;
+
   try {
-    const existingUser = await findUser(email , username)
-    if(existingUser){
-        
-    return res.status(200).json({
-      existingUser,
-      message: 'User with email or password already exist'
-    })
-};
-    //hash password
-    const hashedPassword =await  hashPassword(password)
+    const existingUser = await findUser(email, username);
 
-        //stroe user
+    if (existingUser) {
+      return res.status(409).json({
+        error: true,
+        message: "User with email or username already exists",
+      });
+    }
 
-       const savedData =await  createOrUpdateUser(username , email, hashedPassword)
-        res.status(201).json({
-            error:false,
-            savedData,
-            message: 'Registered Successfully'
-        })
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Store user
+    const savedData = await createOrUpdateUser(
+      username,
+      email,
+      hashedPassword
+    );
+
+    // Send verification email
+    const verification = await sendVerificationMail(savedData);
+
+    console.log("Verification email:", verification);
+
+    return res.status(201).json({
+      error: false,
+      savedData,
+      message:
+        "Registered successfully. Please check your email for verification.",
+    });
   } catch (error) {
     next(error);
   }
@@ -105,3 +120,4 @@ console.log("STORED PASSWORD:", user?.password);        console.log('Found_user'
             next(err)
         }
     }
+
